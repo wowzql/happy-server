@@ -15,11 +15,9 @@ RUN yarn install --frozen-lockfile --ignore-engines
 
 # Copy the rest of the application code
 COPY ./tsconfig.json ./tsconfig.json
-COPY ./vitest.config.ts ./vitest.config.ts
 COPY ./sources ./sources
 
-# Build the Next.js application
-RUN yarn build
+# Skip type checking in production build (tsx runs TypeScript directly)
 
 # Stage 2: Runtime
 FROM node:20 AS runner
