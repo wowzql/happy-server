@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+    app:
+        build: .
+        container_name: happy-server
+        restart: unless-stopped
+        ports:
+            - "3000:3000"
+            - "9090:9090"
+        env_file:
+            - .env
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_started
+            minio:
+                condition: service_started
+        networks:
+            - happy-network
+
+    postgres:
+        image: postgres:15
+        container_name: happy-postgres
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: handy
+        volumes:
+            - pgdata:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+        networks:
+            - happy-network
+
+    redis:
+        image: redis:7-alpine
+        container_name: happy-redis
+        restart: unless-stopped
+        networks:
+            - happy-network
+
+    minio:
+        image: minio/minio
+        container_name: happy-minio
+        restart: unless-stopped
+        command: server /data --console-address ":9001"
+        environment:
+            MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+            MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+        ports:
+            - "9001:9001"
+        volumes:
+            - miniodata:/data
+        networks:
+            - happy-network
+
+    minio-init:
+        image: minio/mc
+        container_name: happy-minio-init
+        depends_on:
+            - minio
+        entrypoint: >
+            /bin/sh -c "
+            sleep 5;
+            mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+            mc mb -p local/$${S3_BUCKET} || true;
+            mc anonymous set download local/$${S3_BUCKET};
+            exit 0;
+            "
+        environment:
+            MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+            MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
+            S3_BUCKET: ${S3_BUCKET}
+        networks:
+            - happy-network
+
+volumes:
+    pgdata:
+    miniodata:
+
+networks:
+    happy-network:
+        driver: bridge
