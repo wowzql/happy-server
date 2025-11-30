@@ -1,12 +1,29 @@
 version: '3.8'
 
 services:
+    caddy:
+        image: caddy:2-alpine
+        container_name: happy-caddy
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+        volumes:
+            - ./Caddyfile:/etc/caddy/Caddyfile:ro
+            - caddy_data:/data
+            - caddy_config:/config
+        depends_on:
+            - app
+        networks:
+            - happy-network
+
     app:
         build: .
         container_name: happy-server
         restart: unless-stopped
+        expose:
+            - "3000"
         ports:
-            - "3000:3000"
             - "9090:9090"
         env_file:
             - .env
@@ -83,6 +100,8 @@ services:
 volumes:
     pgdata:
     miniodata:
+    caddy_data:
+    caddy_config:
 
 networks:
     happy-network:
